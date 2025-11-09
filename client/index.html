@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ArtMing — Collaborative Canvas</title>
+  <link rel="stylesheet" href="style.css"/>
+  <!-- Heroicons (outline) -->
+  <script defer src="https://unpkg.com/lucide@latest"></script>
+</head>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo-dot"></span>
+      <h1 class="brand-title">
+      <span class="brand-main">ArtMing</span>
+      <span class="brand-spark"></span>
+    </h1>
+
+      <span class="beta">LIVE</span>
+    </div>
+
+    <div class="toolbar">
+      <!-- Drawing tools -->
+      <div class="tool-group" role="group" aria-label="Tools">
+        <button class="btn tool active" data-tool="pencil" title="Pencil (thin, hard)">
+          <svg class="i"><use href="#i-pencil"/></svg>
+        </button>
+        <button class="btn tool" data-tool="pen" title="Pen (pressure-like)">
+          <svg class="i"><use href="#i-pen"/></svg>
+        </button>
+        <button class="btn tool" data-tool="brush" title="Brush (soft)">
+          <svg class="i"><use href="#i-brush"/></svg>
+        </button>
+        <button class="btn tool" data-tool="spray" title="Spray / Paint">
+          <svg class="i"><use href="#i-spray"/></svg>
+        </button>
+        <button class="btn tool" data-tool="eraser" title="Eraser">
+          <svg class="i"><use href="#i-eraser"/></svg>
+        </button>
+      </div>
+
+      <!-- Shapes -->
+      <div class="tool-group" role="group" aria-label="Shapes">
+        <button class="btn tool" data-tool="shape-rect" title="Rectangle">
+          <svg class="i"><use href="#i-rect"/></svg>
+        </button>
+        <button class="btn tool" data-tool="shape-ellipse" title="Ellipse">
+          <svg class="i"><use href="#i-ellipse"/></svg>
+        </button>
+        <button class="btn tool" data-tool="shape-line" title="Line">
+          <svg class="i"><use href="#i-line"/></svg>
+        </button>
+        <button class="btn tool" data-tool="select" title="Select / Resize your shapes">
+          <svg class="i"><use href="#i-select"/></svg>
+        </button>
+      </div>
+
+      <!-- Color + size -->
+      <div class="tool-group grow">
+        <div class="color-row">
+          <button class="swatch active" data-color="#ffffff" style="--c:#ffffff"></button>
+          <button class="swatch" data-color="#ff4757" style="--c:#ff4757"></button>
+          <button class="swatch" data-color="#ffa502" style="--c:#ffa502"></button>
+          <button class="swatch" data-color="#2ed573" style="--c:#2ed573"></button>
+          <button class="swatch" data-color="#1e90ff" style="--c:#1e90ff"></button>
+          <button class="swatch" data-color="#a29bfe" style="--c:#a29bfe"></button>
+          <button class="swatch" data-color="#111111" style="--c:#111111"></button>
+          <label class="picker">
+            <input id="customColor" type="color" value="#1e90ff" aria-label="Custom color"/>
+          </label>
+        </div>
+        <div class="size-row">
+          <label>Size</label>
+          <input id="size" type="range" min="1" max="50" value="5"/>
+          <span id="sizeVal">5px</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="tool-group">
+        <button id="undoBtn" class="btn" title="Undo (global)">
+          <svg class="i"><use href="#i-undo"/></svg>
+        </button>
+        <button id="redoBtn" class="btn" title="Redo (global)">
+          <svg class="i"><use href="#i-redo"/></svg>
+        </button>
+        <button id="clearBtn" class="btn" title="Clear canvas (global)">
+          <svg class="i"><use href="#i-trash"/></svg>
+        </button>
+        <button id="downloadBtn" class="btn" title="Download PNG">
+          <svg class="i"><use href="#i-download"/></svg>
+        </button>
+        <button id="themeBtn" class="btn" title="Toggle dark theme">
+          <svg class="i"><use href="#i-moon"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="presence">
+      <div id="status" class="chip online">Connected</div>
+      <div id="users" class="chip">0 online</div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="canvas-shell">
+      <div class="canvas-wrapper">
+        <canvas id="drawingCanvas"></canvas>
+        <canvas id="cursorCanvas"></canvas>
+        <div id="statusMsg" class="toast"></div>
+      </div>
+    </div>
+    <aside class="sidebar">
+      <h3>People</h3>
+      <ul id="userList" class="users"></ul>
+    </aside>
+  </main>
+
+  <!-- Icons sprite -->
+  <svg style="display:none">
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15 6l3 3M3 21l3-1 11-11a2 2 0 10-3-3L3 17l0 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7H8v-7L18 5l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="M9 19c-1.5 0-3 1-3 3 3 0 4-1.5 4-3 0-1-.5-2-1-3l9-9a2.8 2.8 0 114 4l-9 9c-1 .5-2 1-3 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spray" viewBox="0 0 24 24"><circle cx="6" cy="6" r="1"/><circle cx="10" cy="5" r="1"/><circle cx="8" cy="9" r="1"/><path d="M4 10h8v10H4z" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M3 17l6-6 8 8H8zM14 5l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-line" viewBox="0 0 24 24"><path d="M4 20L20 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h9a6 6 0 110 12H7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 6l4 4-4 4M19 10H10a6 6 0 100 12h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-1 0v14a2 2 0 01-2 2H9a2 2 0 01-2-2V6h10z" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  </svg>
+
+  <script>
+    // same-origin server by default; change if you deploy server separately
+    window.SERVER_URL = undefined;
+  </script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+  <script src="websocket.js"></script>
+  <script src="canvas.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
