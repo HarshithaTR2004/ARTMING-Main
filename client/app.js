@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
   window.socketClient = socketClient;
   window.drawingCanvas = canvas;
   // in your canvas/app code
-  document.getElementById('undoBtn').onclick = () => socketClient.emitUndoGlobal();
-  document.getElementById('redoBtn').onclick = () => socketClient.emitRedoGlobal();
+  undoBtn.onclick = () => socketClient.emitUndo();
+  redoBtn.onclick = () => socketClient.emitRedo();
 
   // Request full canvas state after connect
   socketClient.socket.on("connect", () => {

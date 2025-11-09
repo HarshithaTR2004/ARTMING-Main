@@ -1,3 +1,417 @@
+// class DrawingCanvas {
+//   constructor(socketClient) {
+//     this.canvas = document.getElementById('drawingCanvas');
+//     this.overlay = document.getElementById('cursorCanvas');
+//     this.ctx = this.canvas.getContext('2d');
+//     this.octx = this.overlay.getContext('2d');
+//     this.socket = socketClient;
+
+//     this.tool = 'pencil';
+//     this.color = '#111111';
+//     this.size = 5;
+
+//     this.isDrawing = false;
+//     this.currentStroke = null;
+//     this.strokes = [];
+//     this.users = [];
+//     this.you = null;
+
+//     this.selectedId = null;
+//     this.draggingHandle = null;
+
+//     this.cursors = new Map();
+
+//     this._bind();
+//     this._resize();
+//     addEventListener('resize', () => this._resize());
+//   }
+
+//   _bind() {
+//     const start = (e) => {
+//       e.preventDefault();
+//       const p = this._coords(e);
+//       if (this._selectionTryStart(p)) return;
+
+//       if (this.tool.startsWith('shape-')) {
+//         const shape = {
+//           id: `tmp-${Math.random().toString(36).slice(2)}`,
+//           type: this.tool,
+//           x: p.x, y: p.y, w: 0, h: 0,
+//           color: this.color,
+//           size: this.size,
+//           ownerId: this.socket.id,
+//           timestamp: Date.now()
+//         };
+//         this.currentStroke = shape;
+//       } else {
+//         this.isDrawing = true;
+//         this.currentStroke = {
+//           type: 'path',
+//           tool: this.tool,
+//           color: this.color,
+//           size: this.size,
+//           points: [[p.x,p.y]],
+//           ownerId: this.socket.id,
+//           timestamp: Date.now()
+//         };
+//       }
+//     };
+
+//     const move = (e) => {
+//       const p = this._coords(e);
+//       this.socket.emitCursorMove(p.x,p.y);
+
+//       if (this.draggingHandle) { this._selectionResize(p); return; }
+//       if (!this.currentStroke) return;
+
+//       if (this.tool.startsWith('shape-')) {
+//         this.currentStroke.w = p.x - this.currentStroke.x;
+//         this.currentStroke.h = p.y - this.currentStroke.y;
+//         this._renderAll();
+//         this._drawShape(this.currentStroke);
+//       } else if (this.isDrawing) {
+//         const pts = this.currentStroke.points;
+//         const last = pts[pts.length-1];
+//         if (last[0] !== p.x || last[1] !== p.y) {
+//           pts.push([p.x,p.y]);
+//           this._drawStrokeSegment(last, [p.x,p.y], this.currentStroke);
+//           this.socket.emitDrawingChunk({
+//             ...this.currentStroke,
+//             points:[last,[p.x,p.y]]
+//           });
+//         }
+//       }
+//     };
+
+//     const end = () => {
+//       if (this.draggingHandle){ this._finishShapeResize(); return; }
+//       if (!this.currentStroke) return;
+
+//       if (this.currentStroke.type.startsWith('shape-')) {
+//         const s = this.currentStroke;
+//         if (s.w<0){ s.x+=s.w; s.w=Math.abs(s.w); }
+//         if (s.h<0){ s.y+=s.h; s.h=Math.abs(s.h); }
+//         this.strokes.push(s);
+//         this._renderAll();
+//         this.socket.emitStrokeComplete(s);
+//       } else if (this.isDrawing) {
+//         this.isDrawing = false;
+//         if (this.currentStroke.points.length > 1) {
+//           this.strokes.push(this.currentStroke);
+//           this.socket.emitStrokeComplete(this.currentStroke);
+//         }
+//       }
+//       this.currentStroke = null;
+//     };
+
+//     this.overlay.addEventListener('mousedown', start);
+//     this.overlay.addEventListener('mousemove', move);
+//     document.addEventListener('mouseup', end);
+
+//     this.overlay.addEventListener('touchstart', start,{passive:false});
+//     this.overlay.addEventListener('touchmove', move,{passive:false});
+//     this.overlay.addEventListener('touchend', end);
+
+//     document.querySelectorAll('.tool').forEach(b => {
+//       b.onclick = () => {
+//         document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
+//         b.classList.add('active');
+//         this.tool = b.dataset.tool;
+//         this._clearSelection();
+//       };
+//     });
+
+//     document.querySelectorAll('.swatch').forEach(s => {
+//       s.onclick = () => {
+//         document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+//         s.classList.add('active');
+//         this.color = s.dataset.color;
+//         this.currentStroke=null;
+//       };
+//     });
+
+//     document.getElementById('customColor').oninput = (e)=>{
+//       this.color = e.target.value;
+//       document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+//     };
+
+//     document.getElementById('size').oninput = (e)=>{
+//       this.size = parseInt(e.target.value,10);
+//       document.getElementById('sizeVal').textContent = `${this.size}px`;
+//     };
+
+//     // ✅ GLOBAL Undo/Redo
+//     document.getElementById('undoBtn').onclick = () => this.socket.emitUndoGlobal();
+//     document.getElementById('redoBtn').onclick = () => this.socket.emitRedoGlobal();
+
+//     document.getElementById('clearBtn').onclick = () => this.socket.emitClearCanvas();
+//     document.getElementById('downloadBtn').onclick = () => this._download();
+//     document.getElementById('themeBtn').onclick = () => document.body.classList.toggle('light');
+
+//     // ✅ Keyboard shortcuts
+//     document.addEventListener('keydown',(e)=>{
+//       if((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); this.socket.emitUndoGlobal(); }
+//       if((e.ctrlKey||e.metaKey) && (e.key==='y' || (e.shiftKey&&e.key==='Z'))){ e.preventDefault(); this.socket.emitRedoGlobal(); }
+//     });
+
+//     // ✅ Real-time server state handling (no flicker)
+//     this.socket.on('canvasState', ({strokes})=>{
+//       this.strokes = strokes;
+//       this._renderAll();
+//     });
+
+//     this.socket.on('strokeComplete', ({stroke})=>{
+//       this.strokes.push(stroke);
+//       if(stroke.type==='path') this._drawPath(stroke); else this._drawShape(stroke);
+//     });
+
+//     this.socket.on('drawingData', ({stroke})=> this._applyChunk(stroke));
+//     this.socket.on('clearCanvas', ()=>{ this.strokes=[]; this._renderAll(); });
+
+//     this.socket.on('cursorMove', ({user,x,y})=>{
+//       this.cursors.set(user.id,{x,y,color:user.color});
+//       this._drawCursors();
+//     });
+
+//     this.socket.on('shapeUpdate', ({id,patch})=>{
+//       const s=this.strokes.find(x=>x.id===id);
+//       if(s) Object.assign(s,patch);
+//       this._renderAll();
+//     });
+
+//     this.socket.on('init', ({you,users,canvasState})=>{
+//       this.you = you;
+//       this.strokes = canvasState;
+//       this._renderAll();
+//     });
+//   }
+
+//   _resize(){
+//     const rect=this.canvas.parentElement.getBoundingClientRect();
+//     const dpr=Math.max(1,window.devicePixelRatio||1);
+//     [this.canvas,this.overlay].forEach(can=>{
+//       can.width=rect.width*dpr;
+//       can.height=rect.height*dpr;
+//       can.style.width=rect.width+'px';
+//       can.style.height=rect.height+'px';
+//       const c=(can===this.canvas?this.ctx:this.octx);
+//       c.setTransform(dpr,0,0,dpr,0,0);
+//     });
+//     this._renderAll();
+//   }
+
+//   _coords(e){
+//     const rect=this.overlay.getBoundingClientRect();
+//     const t=e.touches?.[0]??e;
+//     return {x:t.clientX-rect.left,y:t.clientY-rect.top};
+//   }
+
+//   // ---------------- RENDER -------------
+//   _renderAll(){
+//     this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+//     for(const s of this.strokes){
+//       if(s.type==='path') this._drawPath(s);
+//       else this._drawShape(s);
+//     }
+//     if(this.selectedId) this._drawSelectionBox();
+//     this._drawCursors();
+//   }
+
+//   _drawPath(s){
+//     for(let i=1;i<s.points.length;i++){
+//       this._drawStrokeSegment(s.points[i-1],s.points[i],s);
+//     }
+//   }
+
+//   _drawStrokeSegment(a,b,s){
+//     this.ctx.save();
+//     this.ctx.lineJoin='round';
+//     this.ctx.lineCap='round';
+
+//     if(s.tool==='eraser'){
+//       this.ctx.globalCompositeOperation='destination-out';
+//       this.ctx.lineWidth=s.size*2;
+//     } else {
+//       this.ctx.globalCompositeOperation='source-over';
+//       this.ctx.strokeStyle=s.color;
+//       if(s.tool==='pencil') this.ctx.lineWidth=Math.max(1,s.size*0.6);
+//       else if(s.tool==='pen') this.ctx.lineWidth=s.size;
+//       else if(s.tool==='brush'){ this.ctx.lineWidth=s.size*1.6; this.ctx.globalAlpha=0.85; }
+//       else if(s.tool==='spray'){
+//         this.ctx.fillStyle=s.color;
+//         for(let i=0;i<25;i++){
+//           const r=Math.random()*s.size;
+//           const ang=Math.random()*Math.PI*2;
+//           this.ctx.fillRect(a[0]+Math.cos(ang)*r,a[1]+Math.sin(ang)*r,1.4,1.4);
+//         }
+//         this.ctx.restore(); return;
+//       }
+//     }
+
+//     this.ctx.beginPath();
+//     this.ctx.moveTo(a[0],a[1]);
+//     this.ctx.lineTo(b[0],b[1]);
+//     this.ctx.stroke();
+//     this.ctx.restore();
+//   }
+
+//   _drawShape(s){
+//     this.ctx.save();
+//     this.ctx.lineWidth=s.size;
+//     this.ctx.strokeStyle=s.color;
+
+//     if(s.type==='shape-rect') this.ctx.strokeRect(s.x,s.y,s.w,s.h);
+//     else if(s.type==='shape-ellipse'){
+//       this.ctx.beginPath();
+//       this.ctx.ellipse(s.x+s.w/2,s.y+s.h/2,Math.abs(s.w/2),Math.abs(s.h/2),0,0,Math.PI*2);
+//       this.ctx.stroke();
+//     } else if(s.type==='shape-line'){
+//       this.ctx.beginPath();
+//       this.ctx.moveTo(s.x,s.y);
+//       this.ctx.lineTo(s.x+s.w,s.y+s.h);
+//       this.ctx.stroke();
+//     }
+//     this.ctx.restore();
+//   }
+
+//   _drawCursors(){
+//     this.octx.clearRect(0,0,this.overlay.width,this.overlay.height);
+//     for(const [id,c] of this.cursors){
+//       if(id===this.socket.id) continue;
+//       this.octx.save();
+//       this.octx.fillStyle=c.color;
+//       this.octx.beginPath();
+//       this.octx.arc(c.x,c.y,3,0,Math.PI*2);
+//       this.octx.fill();
+//       this.octx.restore();
+//     }
+//   }
+
+//   // ----------- Selection & Resize ----------
+//   _hitShape(p){
+//     for(let i=this.strokes.length-1;i>=0;i--){
+//       const s=this.strokes[i];
+//       if(!s.type?.startsWith('shape-')) continue;
+//       if(s.ownerId!==this.socket.id) continue;
+//       if(p.x>=s.x && p.x<=s.x+s.w && p.y>=s.y && p.y<=s.y+s.h) return s;
+//     }
+//     return null;
+//   }
+
+//   _selectionTryStart(p){
+//     if(this.tool!=='select') return false;
+//     const s=this._hitShape(p);
+//     if(!s){ this._clearSelection(); return false; }
+//     this.selectedId=s.id;
+//     this._renderAll();
+//     const handles=this._getHandles(s);
+//     for(const h of handles){
+//       if(p.x>=h.x&&p.x<=h.x+10&&p.y>=h.y&&p.y<=h.y+10){
+//         this.draggingHandle=h.pos; return true;
+//       }
+//     }
+//     this.draggingHandle='move';
+//     this.dragOrigin={x:p.x,y:p.y,sx:s.x,sy:s.y};
+//     return true;
+//   }
+
+//   _getHandles(s){
+//     const x=s.x,y=s.y,w=s.w,h=s.h;
+//     return [
+//       {pos:'nw',x:x-5,y:y-5},
+//       {pos:'n',x:x+w/2-5,y:y-5},
+//       {pos:'ne',x:x+w-5,y:y-5},
+//       {pos:'e',x:x+w-5,y:y+h/2-5},
+//       {pos:'se',x:x+w-5,y:y+h-5},
+//       {pos:'s',x:x+w/2-5,y:y+h-5},
+//       {pos:'sw',x:x-5,y:y+h-5},
+//       {pos:'w',x:x-5,y:y+h/2-5}
+//     ];
+//   }
+
+//   _drawSelectionBox(){
+//     const s=this.strokes.find(x=>x.id===this.selectedId);
+//     if(!s) return;
+//     this.ctx.save();
+//     this.ctx.setLineDash([5,5]);
+//     this.ctx.strokeStyle='#2563eb';
+//     this.ctx.strokeRect(s.x,s.y,s.w,s.h);
+//     this.ctx.restore();
+//     const handles=this._getHandles(s);
+//     for(const h of handles) this._drawHandle(h.x,h.y);
+//   }
+
+//   _drawHandle(x,y){
+//     this.octx.save();
+//     this.octx.fillStyle='#fde047';
+//     this.octx.strokeStyle='#111';
+//     this.octx.fillRect(x,y,10,10);
+//     this.octx.strokeRect(x,y,10,10);
+//     this.octx.restore();
+//   }
+
+//   _selectionResize(p){
+//     const s=this.strokes.find(x=>x.id===this.selectedId);
+//     if(!s) return;
+//     if(this.draggingHandle==='move'){
+//       const dx=p.x-this.dragOrigin.x, dy=p.y-this.dragOrigin.y;
+//       s.x=this.dragOrigin.sx+dx; s.y=this.dragOrigin.sy+dy;
+//     } else {
+//       if(this.draggingHandle.includes('n')){
+//         const bottom=s.y+s.h;
+//         s.y=p.y; s.h=bottom-p.y;
+//       }
+//       if(this.draggingHandle.includes('s')){
+//         s.h=p.y-s.y;
+//       }
+//       if(this.draggingHandle.includes('w')){
+//         const right=s.x+s.w;
+//         s.x=p.x; s.w=right-p.x;
+//       }
+//       if(this.draggingHandle.includes('e')){
+//         s.w=p.x-s.x;
+//       }
+//     }
+//     this._renderAll();
+//   }
+
+//   _finishShapeResize(){
+//     this.draggingHandle=null;
+//     const s=this.strokes.find(x=>x.id===this.selectedId);
+//     if(s) this.socket.emitShapeUpdate({id:s.id,patch:{x:s.x,y:s.y,w:s.w,h:s.h}});
+//   }
+
+//   _clearSelection(){
+//     this.selectedId=null;
+//     this.draggingHandle=null;
+//     this._renderAll();
+//   }
+
+//   // ------------ Apply remote freehand chunk ----------
+//   _applyChunk(chunk){
+//     if(chunk.type!=='path') return;
+//     let last=this.strokes[this.strokes.length-1];
+//     if(!last || last.id!==chunk.id){
+//       this._drawStrokeSegment(chunk.points[0],chunk.points[1],chunk);
+//     } else {
+//       last.points.push(chunk.points[1]);
+//       this._drawStrokeSegment(chunk.points[0],chunk.points[1],last);
+//     }
+//   }
+
+//   _download(){
+//     const c=document.createElement('canvas');
+//     c.width=this.canvas.width; c.height=this.canvas.height;
+//     c.getContext('2d').drawImage(this.canvas,0,0);
+//     const a=document.createElement('a');
+//     a.download='artming.png';
+//     a.href=c.toDataURL();
+//     a.click();
+//   }
+// }
+
+// window.DrawingCanvas = DrawingCanvas;
+// client/canvas.js
 class DrawingCanvas {
   constructor(socketClient) {
     // DOM
